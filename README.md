@@ -16,6 +16,47 @@ It also includes scripts to preprocess multimodal datasets (visible light, IR, s
 
 ---
 
+## How DINOV3 and VGGT Work (High-Level)
+
+### DINOV3 (self-supervised visual representation learning)
+
+DINOV3 belongs to the DINO family of models that learn strong visual features from large, mostly unlabeled image corpora using **self-distillation**.
+
+At a high level, the training loop is:
+
+1. Create multiple augmented views/crops of the same image.
+2. Pass a global view through a **teacher** network.
+3. Pass global + local views through a **student** network.
+4. Train the student to match the teacher's output distribution across views.
+5. Update the teacher from the student using an exponential moving average (EMA), rather than direct gradient updates.
+
+This yields embeddings that transfer well to downstream tasks (classification, retrieval, segmentation, geometry pipelines) with limited labels.
+
+Recommended references:
+
+- DINO (foundational method): <https://arxiv.org/abs/2104.14294>
+- DINOv2 (widely used successor): <https://arxiv.org/abs/2304.07193>
+- DINOv3 papers/releases (latest): <https://arxiv.org/search/?query=dinov3&searchtype=all>
+
+### VGGT (geometry-aware vision transformer for 3D reconstruction)
+
+In this project, VGGT is used as the geometry-focused model in the 3D pipeline. Conceptually, a geometry transformer works by:
+
+1. Encoding one or more images into patch/token features.
+2. Exchanging context across views (or frames) with attention.
+3. Regressing/decoding geometric signals such as depth, camera pose, correspondences, or point-level structure.
+4. Aggregating those predictions into a coarse 3D representation (e.g., point cloud).
+
+Our app combines DINOV3-style semantic features + VGGT-style geometric prediction to build robust scene reconstructions from a single image, multiple images, or sampled video frames.
+
+Recommended references:
+
+- VGGT papers/releases (latest): <https://arxiv.org/search/?query=vggt&searchtype=all>
+
+> Note: this repository ships lightweight wrappers/scaffolds for local experimentation. For production-level fidelity, adapt the exact architecture, losses, data sampling, and camera/depth supervision strategy used by your chosen DINOV3/VGGT checkpoints.
+
+---
+
 ## Repository Layout
 
 ```text
