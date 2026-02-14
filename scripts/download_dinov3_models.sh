@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_DIR="$ROOT_DIR/models/dinov3"
+
 REPO_DIR="$ROOT_DIR"
 
 mkdir -p "$TARGET_DIR"
@@ -59,6 +60,7 @@ download_one() {
 
   wget -c --tries=3 --timeout=30 -O "$out_path" "$signed_url"
 }
+
 
 upload_with_release() {
   local files=("$@")
@@ -142,6 +144,7 @@ echo
 echo "Optional: if you have a signed URL query token from Meta (starts with 'Policy='),"
 echo "paste it once and it will be appended to all selected model URLs."
 read -r -p "Shared signed query token (optional): " shared_query
+print_menu
 read -r -p "Selection: " selection
 
 if [[ -z "${selection// }" ]]; then
@@ -173,49 +176,18 @@ fi
 printf "\nDownloading %d selected model(s) into %s\n\n" "${#selected_indices[@]}" "$TARGET_DIR"
 
 failed=0
-downloaded_files=()
 for idx in "${selected_indices[@]}"; do
   entry="${MODELS[$((idx - 1))]}"
   IFS='|' read -r _name url _desc <<<"$entry"
-
-  if [[ -n "$shared_query" && "$url" != *"?"* ]]; then
-    url="$url?$shared_query"
-  fi
 
   filename="$(basename "${url%%\?*}")"
   output_path="$TARGET_DIR/$filename"
 
   if ! download_one "$url" "$output_path"; then
     failed=1
-  else
-    downloaded_files+=("$output_path")
   fi
   echo
  done
-
-if (( ${#downloaded_files[@]} > 0 )); then
-  echo "Downloaded ${#downloaded_files[@]} file(s) successfully."
-  echo "Upload options:"
-  echo "  n) do not upload"
-  echo "  g) commit/push to GitHub repository page (git)"
-  echo "  r) upload bundle to GitHub Releases (gh CLI)"
-  read -r -p "Choose upload option [n/g/r]: " upload_choice
-
-  case "${upload_choice,,}" in
-    g)
-      upload_with_git "${downloaded_files[@]}" || failed=1
-      ;;
-    r)
-      upload_with_release "${downloaded_files[@]}" || failed=1
-      ;;
-    ""|n)
-      echo "Skipping upload step."
-      ;;
-    *)
-      echo "Unknown upload option '$upload_choice'. Skipping upload."
-      ;;
-  esac
-fi
 
 if ((failed)); then
   echo "Finished with some skipped/failed downloads."

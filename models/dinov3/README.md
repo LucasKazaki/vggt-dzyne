@@ -14,12 +14,14 @@ The script now:
 - Shows a numbered list of available checkpoints.
 - Prints a short use-case description for each model.
 - Lets you choose one, many, or all models interactively.
+
 - Accepts an optional shared signed query token (for temporary Meta links) and appends it to all selected model URLs.
 - Saves files with clean checkpoint filenames (avoids very long query-string-based names).
 - If a download returns HTTP 403, prompts for a fresh signed URL so you can retry only that model.
 - After successful downloads, offers optional upload to GitHub:
   - `g`: commit/push selected checkpoints to the repo branch (GitHub file page).
   - `r`: create/upload a `.tar.gz` bundle to GitHub Releases using `gh` CLI.
+
 
 ## Why HTTP 403 can happen
 
