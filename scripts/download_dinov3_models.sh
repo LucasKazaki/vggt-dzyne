@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_DIR="$ROOT_DIR/models/dinov3"
 
+REPO_DIR="$ROOT_DIR"
+
 mkdir -p "$TARGET_DIR"
 
 MODELS=(
@@ -59,6 +61,89 @@ download_one() {
   wget -c --tries=3 --timeout=30 -O "$out_path" "$signed_url"
 }
 
+
+upload_with_release() {
+  local files=("$@")
+  local default_repo
+  local repo
+  local tag
+  local title
+  local archive_name
+  local archive_path
+
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "GitHub CLI (gh) is not installed. Skipping release upload."
+    return 1
+  fi
+
+  default_repo="$(git -C "$REPO_DIR" remote get-url origin 2>/dev/null | sed -E 's#(git@github.com:|https://github.com/)##; s#\.git$##')"
+  read -r -p "GitHub repo for release upload [${default_repo:-owner/repo}]: " repo
+  repo="${repo:-$default_repo}"
+  if [[ -z "$repo" ]]; then
+    echo "Repository is required for release upload."
+    return 1
+  fi
+
+  tag="dinov3-models-$(date +%Y%m%d-%H%M%S)"
+  read -r -p "Release tag [$tag]: " input_tag
+  tag="${input_tag:-$tag}"
+
+  title="DINOv3 model bundle $tag"
+  read -r -p "Release title [$title]: " input_title
+  title="${input_title:-$title}"
+
+  archive_name="$tag.tar.gz"
+  archive_path="$TARGET_DIR/$archive_name"
+  tar -czf "$archive_path" -C "$TARGET_DIR" "${files[@]##*/}"
+
+  if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
+    gh release upload "$tag" "$archive_path" --repo "$repo" --clobber
+  else
+    gh release create "$tag" "$archive_path" --repo "$repo" --title "$title" --notes "DINOv3 selected model bundle uploaded by script."
+  fi
+
+  echo "Release upload complete: https://github.com/$repo/releases/tag/$tag"
+}
+
+upload_with_git() {
+  local files=("$@")
+  local branch
+  local commit_message
+
+  if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "Current directory is not a git repository. Skipping git upload."
+    return 1
+  fi
+
+  echo "Preparing git upload from local machine."
+  if ! command -v git-lfs >/dev/null 2>&1; then
+    echo "⚠️  git-lfs is not installed. Large model files may exceed GitHub limits."
+    echo "    Install git-lfs and run 'git lfs install' for reliable model uploads."
+  fi
+
+  branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD)"
+  read -r -p "Branch to push models [$branch]: " input_branch
+  branch="${input_branch:-$branch}"
+
+  if [[ "$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD)" != "$branch" ]]; then
+    git -C "$REPO_DIR" checkout "$branch"
+  fi
+
+  git -C "$REPO_DIR" add -- "${files[@]}"
+  commit_message="Add selected DINOv3 model checkpoints"
+  read -r -p "Commit message [$commit_message]: " input_message
+  commit_message="${input_message:-$commit_message}"
+  git -C "$REPO_DIR" commit -m "$commit_message"
+  git -C "$REPO_DIR" push origin "$branch"
+
+  echo "Git upload complete to branch '$branch'."
+}
+
+print_menu
+echo
+echo "Optional: if you have a signed URL query token from Meta (starts with 'Policy='),"
+echo "paste it once and it will be appended to all selected model URLs."
+read -r -p "Shared signed query token (optional): " shared_query
 print_menu
 read -r -p "Selection: " selection
 
